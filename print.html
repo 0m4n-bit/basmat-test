@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>طباعة – بصمة التميّز</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{margin:0;background:#F2EAEF;color:#2E1D2A;font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;font-size:12pt;line-height:1.6;direction:rtl}
+.bar{position:sticky;top:0;background:#7E3A64;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:5}
+.bar button{min-height:44px;padding:0 18px;border-radius:10px;border:0;background:#fff;color:#7E3A64;font:700 15px 'IBM Plex Sans Arabic',sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.bar button:disabled{opacity:.7;cursor:wait}
+.bar button.ico{width:44px;padding:0}
+.bar .acts{display:flex;gap:8px;flex:none}
+.bar span{font-size:13px}
+.paper{background:#fff;max-width:210mm;margin:16px auto;padding:14mm 12mm;box-shadow:0 2px 12px rgba(46,29,42,.12);overflow-x:auto}
+@media (max-width:640px){.paper{margin:8px;padding:18px 12px}.bar{padding:8px 10px}.bar span{font-size:12px}}
+.head{border-bottom:3px solid #AC5389;padding-bottom:10px;margin-bottom:14px}
+.head .min{font-size:10.5pt;color:#5F4D59}
+.head h1{margin:4px 0 0;font-size:18pt;color:#7E3A64}
+h2{font-size:14pt;color:#7E3A64;margin:18px 0 8px;border-right:4px solid #AC5389;padding-right:8px}
+h3{font-size:12.5pt;margin:14px 0 6px}
+table{width:100%;border-collapse:collapse;margin:6px 0 10px;page-break-inside:auto}
+tr{page-break-inside:avoid}
+th,td{border:1px solid #B9A3B0;padding:6px 7px;text-align:right;vertical-align:top}
+th{background:#F3DDE7;font-weight:700}
+table.small{font-size:10pt}
+table.small th,table.small td{padding:4px 5px}
+.kv td:first-child{width:38%;background:#FAF4F7;font-weight:600}
+.txt{border:1px solid #B9A3B0;border-radius:6px;padding:8px 10px;min-height:48px;white-space:pre-line;margin:4px 0 10px}
+ul{margin:4px 0 10px;padding-right:22px}
+.sign{display:flex;justify-content:space-between;gap:16px;margin-top:28px;page-break-inside:avoid}
+.sign div{flex:1;text-align:center;font-weight:600}
+.sign div span{display:block;margin-top:34px;border-top:1px dotted #5F4D59}
+.brk{page-break-after:always;height:0}
+.kv3{display:flex;flex-wrap:wrap;gap:8px 24px;border:1px solid #B9A3B0;border-radius:8px;padding:8px 12px;margin:4px 0 10px;background:#FBF7F9}
+.kv3 span{display:inline-block;min-width:120px;border-bottom:1px dotted #5F4D59}
+th.grp{background:#F3DDE7;text-align:center}
+th.sub{font-size:8.5pt;font-weight:600;text-align:center;background:#FAF0F5}
+table.marks td.mk{width:9%;min-width:34px;text-align:center;font-size:13pt;line-height:1;color:#B9A3B0}
+table.marks td.mk.on{color:#7E3A64;font-weight:700}
+.foot{margin-top:18px;font-size:9pt;color:#8B7984;text-align:center}
+@media print{body{background:#fff}.bar{display:none}.paper{box-shadow:none;margin:0;max-width:none;padding:0;overflow:visible}}
+</style>
+</head>
+<body>
+<div class="bar"><div class="acts">
+<button type="button" id="pbtn" class="ico" aria-label="طباعة" title="طباعة"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg></button>
+<button type="button" id="sbtn" disabled><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span>حفظ PDF</span></button>
+</div><span id="phint"></span></div>
+<div class="paper" id="doc"></div>
+<script src="config.js?v=1.4.0"></script>
+<script src="api.js?v=1.4.0"></script>
+<script src="pdfmaker.js?v=1.4.0"></script>
+<script>
+(function () {
+  var iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var hint = document.getElementById('phint'), sbtn = document.getElementById('sbtn'), slab = sbtn.querySelector('span');
+  hint.textContent = iOS ? 'إن لم تظهر نافذة الطباعة: «حفظ PDF» ثم «طباعة» من قائمة المشاركة' : '';
+  document.getElementById('pbtn').addEventListener('click', function () { try { window.print(); } catch (e) {} });
+  var CUR = null, pdfP = null, pdfBlob = null;
+  function prep() {
+    if (!pdfP && CUR) pdfP = window.BasmatPDF.make(CUR).then(function (b) { pdfBlob = b; return b; }, function (e) { pdfP = null; throw e; });
+    return pdfP;
+  }
+  function fileName() { return String(CUR.title || 'تقرير').replace(/[\\/:*?"<>|#]+/g, ' ').trim().slice(0, 80) + '.pdf'; }
+  function deliver(blob, late) {
+    var name = fileName(), file = null;
+    try { file = new File([blob], name, { type: 'application/pdf' }); } catch (e) {}
+    if (iOS && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (late) { slab.textContent = 'الملف جاهز – اضغطي للحفظ'; return; } // آيفون يطلب ضغطة جديدة لفتح قائمة المشاركة
+      navigator.share({ files: [file], title: CUR.title }).then(function () {}, function () {});
+      slab.textContent = 'حفظ PDF';
+      return;
+    }
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    slab.textContent = 'حفظ PDF';
+  }
+  sbtn.addEventListener('click', function () {
+    if (!CUR) return;
+    if (pdfBlob) { deliver(pdfBlob, false); return; }
+    sbtn.disabled = true; slab.textContent = 'جارٍ تجهيز الملف…';
+    prep().then(function (b) { sbtn.disabled = false; deliver(b, true); }, function () { sbtn.disabled = false; slab.textContent = 'تعذّر – حاولي مرة أخرى'; });
+  });
+  var Q = new URLSearchParams(location.search), P = {};
+  Q.forEach(function (v, k) { P[k] = v; });
+  var token = null;
+  var hm = /[#&]t=([^&]+)/.exec(location.hash);
+  if (hm) { token = decodeURIComponent(hm[1]); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  if (!token) { try { token = localStorage.getItem('basmat_token'); } catch (e) {} }
+  var docEl = document.getElementById('doc');
+  docEl.innerHTML = '<p style="text-align:center;color:#8B7984;padding:40px 0">جارٍ تجهيز التقرير…</p>';
+  if (!token) { show({ title: 'تعذّر فتح الصفحة', blocks: [{ type: 'text', text: 'سجّلي الدخول إلى المنصة من نفس المتصفح أولاً، ثم افتحي التقرير مرة أخرى.' }] }); return; }
+  window.basmatRpc('printDoc', [token, P.type || '', P]).then(show, function (e) {
+    show({ title: 'تعذّر فتح الصفحة', blocks: [{ type: 'text', text: e.message }] });
+  });
+  function show(D) {
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var h = '<div class="head"><div class="min">سلطنة عُمان · وزارة التعليم' + (D.subtitle ? ' · ' + esc(D.subtitle) : '') + '</div><h1>' + esc(D.title) + '</h1></div>';
+  (D.blocks || []).forEach(function (b) {
+    if (b.type === 'h') h += '<h2>' + esc(b.text) + '</h2>';
+    else if (b.type === 'h2') h += '<h3>' + esc(b.text) + '</h3>';
+    else if (b.type === 'break') h += '<div class="brk"></div>';
+    else if (b.type === 'kv') h += '<table class="kv"><tbody>' + b.rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>'; }).join('') + '</tbody></table>';
+    else if (b.type === 'table') {
+      var rows = (b.rows || []).slice();
+      var width = b.groups ? b.groups.reduce(function (n, g) { return n + (g.span || 1); }, 0) : b.head.length;
+      var n = Math.max(0, (b.minRows || 0) - rows.length);
+      for (var i = 0; i < n; i++) { var e = []; for (var k = 0; k < width; k++) e.push(' '); rows.push(e); }
+      var thead = '';
+      if (b.groups) {
+        thead = '<tr>' + b.groups.map(function (g) { return '<th class="grp"' + (g.span > 1 ? ' colspan="' + g.span + '"' : '') + (g.rows > 1 ? ' rowspan="' + g.rows + '"' : '') + '>' + esc(g.text) + '</th>'; }).join('') + '</tr>' +
+          '<tr>' + b.head.map(function (x) { return '<th class="sub">' + esc(x) + '</th>'; }).join('') + '</tr>';
+      } else thead = '<tr>' + b.head.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr>';
+      var cls = [b.small ? 'small' : '', b.marks ? 'marks' : ''].join(' ').trim();
+      h += '<table' + (cls ? ' class="' + cls + '"' : '') + '><thead>' + thead + '</thead><tbody>' +
+        (rows.length ? rows.map(function (r) { return '<tr>' + r.map(function (c) { var m = c === '☑' || c === '☐'; return '<td' + (m ? ' class="mk' + (c === '☑' ? ' on' : '') + '"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') : '<tr><td colspan="' + width + '" style="text-align:center;color:#8B7984">لا توجد بيانات</td></tr>') + '</tbody></table>';
+    }
+    else if (b.type === 'kv3') h += '<div class="kv3">' + b.rows.map(function (r) { return '<div><b>' + esc(r[0]) + ':</b> <span>' + esc(r[1]) + '</span></div>'; }).join('') + '</div>';
+    else if (b.type === 'text') h += (b.title ? '<h3>' + esc(b.title) + '</h3>' : '') + '<div class="txt">' + esc(b.text) + '</div>';
+    else if (b.type === 'list') h += '<h3>' + esc(b.title) + '</h3>' + (b.items && b.items.length ? '<ul>' + b.items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<div class="txt"></div>');
+    else if (b.type === 'sign') h += '<div class="sign">' + b.names.map(function (x) { return '<div>' + esc(x) + '<span>التوقيع</span></div>'; }).join('') + '</div>';
+  });
+  h += '<div class="foot">أُعدّ عبر منصة بصمة التميّز · ' + new Date().toLocaleDateString('ar-OM') + '</div>';
+  docEl.innerHTML = h;
+  document.title = D.title;
+  if (D.blocks && D.title !== 'تعذّر فتح الصفحة') { CUR = D; sbtn.disabled = false; setTimeout(function () { prep().then(null, function () {}); }, 400); }
+  if (D.landscape) { var st = document.createElement('style'); st.textContent = '@page{size:A4 landscape;margin:10mm}.paper{max-width:297mm}'; document.head.appendChild(st); }
+  }
+})();
+</script>
+</body>
+</html>

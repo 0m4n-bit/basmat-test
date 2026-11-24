@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7E3A64">
+<meta name="robots" content="noindex">
+<title>نموذج – بصمة التميّز</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=1.4.0">
+<style>
+.fhead{background:var(--pri-d);color:#fff;padding:22px 18px 20px;display:flex;flex-direction:column;gap:6px}
+.fhead .s{font-size:12px;color:#F0D6E1}
+.fwrap{max-width:640px;margin:0 auto;padding:16px 16px 40px;display:flex;flex-direction:column;gap:14px}
+.gridq{border:0;margin:0;padding:12px 0;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+.gridq legend{padding:0;font-size:14px;font-weight:600;line-height:1.6}
+.opts{display:grid;gap:6px}
+.trow{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:8px}
+.trow>span{padding-top:12px;min-width:14px;text-align:center}
+.tcells{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
+.opts label{position:relative}
+.opts input{position:absolute;opacity:0;pointer-events:none}
+.opts span{min-height:44px;padding:4px;border-radius:10px;font-size:12px;font-weight:600;border:1.5px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;line-height:1.3}
+.opts input:checked+span{border-color:var(--pri);background:var(--pri);color:#fff}
+.opts input:focus-visible+span{outline:2px solid var(--pri);outline-offset:2px}
+.req{color:#B4501E}
+.err-field .in,.err-field .opts span{border-color:#C2410C}
+</style>
+</head>
+<body>
+<script src="config.js?v=1.4.0"></script>
+<script src="api.js?v=1.4.0"></script>
+<div id="root"><div class="login"><div class="spinner" role="status" aria-label="جارٍ التحميل"></div></div></div>
+<script>
+var FORM_ID = (new URLSearchParams(location.search).get('id') || '').replace(/[^A-Za-z0-9]/g, '');
+(function () {
+  'use strict';
+  var root = document.getElementById('root');
+  var F = null;
+  var files = {};
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function rpc(fn, args) { return window.basmatRpc(fn, args); }
+/* حقول الأرقام: type=text + inputmode=numeric (لأن آيفون يرفض الأرقام العربية في type=number)، وتحويل ٠-٩ إلى 0-9 أثناء الكتابة */
+  document.addEventListener('input', function (ev) {
+    var el = ev.target;
+    if (!el || el.tagName !== 'INPUT' || !(el.getAttribute('data-num') || el.type === 'tel')) return;
+    var v = el.value, n = v.replace(/[\u0660-\u0669]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }).replace(/[\u06F0-\u06F9]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); }).replace(/[\u066B\u060C,]/g, '.');
+    if (el.getAttribute('data-num')) n = n.replace(/[^0-9.]/g, '');
+    if (n !== v) { el.value = n; }
+  }, true);
+  function head() {
+    return '<header class="fhead"><span class="s">' + esc((F && F.school) || '') + (F && F.field ? ' · ' + esc(F.field) : '') + '</span><h1 style="font-size:21px">' + esc(F ? F.title : 'نموذج') + '</h1>' + (F && F.year ? '<span class="s">العام الدراسي ' + esc(F.year) + (F.deadline ? ' · آخر موعد ' + esc(F.deadline) : '') + '</span>' : '') + '</header>';
+  }
+  function msg(icon, title, text) {
+    root.innerHTML = head() + '<div class="fwrap"><div class="card" style="align-items:center;text-align:center;padding:28px 20px"><div style="font-size:40px" aria-hidden="true">' + icon + '</div><h2 style="font-size:18px">' + esc(title) + '</h2><p class="muted">' + esc(text) + '</p></div></div>';
+  }
+  function field(f) {
+    var req = f.required ? ' <span class="req" aria-hidden="true">*</span>' : '';
+    var id = 'q_' + f.id;
+    if (f.type === 'section') return '<h2>' + esc(f.label) + '</h2>';
+    if (f.type === 'teacher') return '<label class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><select id="' + id + '" class="in"' + (f.required ? ' required' : '') + '><option value="">اختاري الاسم…</option>' + F.teachers.map(function (t) { return '<option value="' + esc(t.id) + '">' + esc(t.name) + '</option>'; }).join('') + '</select></label>';
+    if (f.type === 'textarea') return '<label class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><textarea id="' + id + '" class="in" rows="3"' + (f.required ? ' required' : '') + '></textarea></label>';
+    if (f.type === 'select') return '<label class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><select id="' + id + '" class="in"' + (f.required ? ' required' : '') + '><option value="">اختاري…</option>' + f.options.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></label>';
+    if (f.type === 'radio') return '<fieldset class="gridq" data-fid="' + f.id + '" style="border:0"><legend>' + esc(f.label) + req + '</legend><div class="opts" style="grid-template-columns:repeat(' + Math.min(f.options.length, 3) + ',minmax(0,1fr))">' + f.options.map(function (o) { return '<label><input type="radio" name="' + id + '" value="' + esc(o) + '"><span>' + esc(o) + '</span></label>'; }).join('') + '</div></fieldset>';
+    if (f.type === 'grid') {
+      var cols = Math.min(f.options.length, 5);
+      return '<div data-fid="' + f.id + '"><h2 style="margin-bottom:4px">' + esc(f.label) + req + '</h2>' + f.rows.map(function (row, i) {
+        return '<fieldset class="gridq"><legend><span class="muted num">' + (i + 1) + '.</span> ' + esc(row) + '</legend><div class="opts" style="grid-template-columns:repeat(' + cols + ',minmax(0,1fr))">' + f.options.map(function (o, j) { return '<label><input type="radio" name="' + id + '_' + i + '" value="' + j + '"><span>' + esc(o) + '</span></label>'; }).join('') + '</div>' + (f.notes ? '<input type="text" class="in" style="min-height:40px" aria-label="ملاحظات: ' + esc(row) + '" id="' + id + '_n' + i + '" placeholder="ملاحظات (اختياري)">' : '') + '</fieldset>';
+      }).join('') + '</div>';
+    }
+    if (f.type === 'table') {
+      var n0 = Math.max(1, Number(f.rows) || 3);
+      var rowsH = '';
+      for (var r = 0; r < n0; r++) rowsH += tableRow(f, r);
+      return '<div class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><div id="tb_' + f.id + '" style="display:flex;flex-direction:column;gap:8px">' + rowsH + '</div><button type="button" class="btn sm" data-addrow="' + f.id + '" style="align-self:flex-start">+ إضافة صف</button></div>';
+    }
+    if (f.type === 'file') return '<div class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><label class="dash">⬆︎ اختيار صور أو PDF' + (f.accept === 'xlsx' ? ' أو Excel' : '') + '<input type="file" multiple data-file="' + f.id + '" accept="image/*,application/pdf,.docx,.xlsx,.xls,.pptx"></label><div id="fl_' + f.id + '" style="display:flex;flex-direction:column;gap:6px"></div><span class="hint">حتى 10 ميجابايت للملف. الفيديو: ضعي رابطه بدلاً من رفعه.</span></div>';
+    var type = f.type === 'date' ? 'date' : f.type === 'link' ? 'url' : 'text';
+    return '<label class="field" data-fid="' + f.id + '"><span>' + esc(f.label) + req + '</span><input id="' + id + '" class="in" type="' + type + '"' + (f.type === 'number' ? ' inputmode="decimal" autocomplete="off" data-num="1"' : '') + (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : '') + (f.type === 'link' ? ' placeholder="https://"' : '') + (f.required ? ' required' : '') + ' dir="auto"></label>';
+  }
+  function tableRow(f, r) {
+    return '<div class="trow" data-trow="' + f.id + '"><span class="xs muted">' + (r + 1) + '</span><div class="tcells">' + (f.columns || []).map(function (c, k) {
+      return '<input class="in" aria-label="' + esc(c) + ' – صف ' + (r + 1) + '" placeholder="' + esc(c) + '" data-tcol="' + k + '" dir="auto">';
+    }).join('') + '</div></div>';
+  }
+  function renderForm() {
+    var sections = [], cur = [];
+    F.fields.forEach(function (f) { if (f.type === 'grid') { if (cur.length) sections.push(cur); sections.push([f]); cur = []; } else cur.push(f); });
+    if (cur.length) sections.push(cur);
+    root.innerHTML = head() + '<form class="fwrap" id="frm" novalidate>' + (F.description ? '<p class="note info">' + esc(F.description) + '</p>' : '') +
+      sections.map(function (sec) { return '<section class="card">' + sec.map(field).join('') + '</section>'; }).join('') +
+      '<div id="ferr" role="alert"></div><button class="btn pri block" type="submit" style="min-height:54px;font-size:16px">إرسال</button><p class="xs muted" style="text-align:center">' + (F.audience === 'parents' ? 'إجاباتكم سرية وتُستخدم للتطوير فقط.' : 'يصل الرد للمعلمة الأولى فقط.') + '</p></form>';
+  }
+  /* تصغير الصور قبل الرفع (أطول ضلع 1600px، JPEG 82%) – صورة جوال 4 ميجا تصبح ~300 كيلو فيصير الرفع أسرع بكثير */
+  function shrinkImage(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpe?g|png|webp|hei[cf])$/i.test(file.type || '') || file.size < 350 * 1024 || !window.URL || !document.createElement('canvas').getContext) { resolve(null); return; }
+      var url = URL.createObjectURL(file), img = new Image();
+      var done = function (x) { try { URL.revokeObjectURL(url); } catch (e) {} resolve(x); };
+      img.onload = function () {
+        try {
+          var max = 1600, w = img.naturalWidth, h = img.naturalHeight;
+          if (!w || !h) { done(null); return; }
+          var k = Math.min(1, max / Math.max(w, h));
+          var cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+          var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+          var data = cv.toDataURL('image/jpeg', 0.82);
+          if (data.length * 0.75 >= file.size) { done(null); return; }
+          done({ name: String(file.name || 'صورة').replace(/\.[^.]+$/, '') + '.jpg', mime: 'image/jpeg', data: data, size: Math.round(data.length * 0.75) });
+        } catch (e) { done(null); }
+      };
+      img.onerror = function () { done(null); };
+      img.src = url;
+    });
+  }
+  function readFile(file) {
+    return shrinkImage(file).then(function (small) {
+      if (small) return small;
+      return new Promise(function (res, rej) {
+        if (file.size > F.maxFileBytes) { rej(new Error('حجم «' + file.name + '» أكبر من 10 ميجابايت')); return; }
+        var r = new FileReader();
+        r.onload = function () { res({ name: file.name, mime: file.type || mimeOf(file.name), data: r.result, size: file.size }); };
+        r.onerror = function () { rej(new Error('تعذرت قراءة الملف')); };
+        r.readAsDataURL(file);
+      });
+    });
+  }
+  function mimeOf(n) { n = n.toLowerCase(); if (/\.pdf$/.test(n)) return 'application/pdf'; if (/\.xlsx$/.test(n)) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; if (/\.xls$/.test(n)) return 'application/vnd.ms-excel'; if (/\.docx$/.test(n)) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; if (/\.pptx$/.test(n)) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'; if (/\.jpe?g$/.test(n)) return 'image/jpeg'; if (/\.png$/.test(n)) return 'image/png'; if (/\.hei[cf]$/.test(n)) return 'image/heic'; return ''; }
+  function drawFiles(fid) {
+    var box = document.getElementById('fl_' + fid);
+    box.innerHTML = (files[fid] || []).map(function (f, i) { return '<div class="file"><span class="grow ellipsis">' + esc(f.name) + '</span><span class="xs muted num">' + Math.round(f.size / 1024) + ' KB</span><button type="button" class="btn sm" data-rm="' + fid + '" data-i="' + i + '" aria-label="إزالة ' + esc(f.name) + '">إزالة</button></div>'; }).join('');
+  }
+  function collect() {
+    var values = {}, problems = [];
+    document.querySelectorAll('.err-field').forEach(function (e) { e.classList.remove('err-field'); });
+    F.fields.forEach(function (f) {
+      var id = 'q_' + f.id, v = '';
+      if (f.type === 'section') return;
+      if (f.type === 'file') { if (f.required && !(files[f.id] || []).length) problems.push(f); return; }
+      if (f.type === 'grid') {
+        var ans = [], notes = [], missing = false;
+        f.rows.forEach(function (_, i) { var c = document.querySelector('input[name="' + id + '_' + i + '"]:checked'); ans.push(c ? Number(c.value) : null); if (!c) missing = true; var n = document.getElementById(id + '_n' + i); notes.push(n ? n.value.trim() : ''); });
+        values[f.id] = { answers: ans, notes: notes };
+        if (f.required && missing) problems.push(f);
+        return;
+      }
+      if (f.type === 'table') {
+        var rows = [];
+        document.querySelectorAll('[data-trow="' + f.id + '"]').forEach(function (tr) {
+          var row = Array.prototype.map.call(tr.querySelectorAll('[data-tcol]'), function (x) { return x.value.trim(); });
+          if (row.some(function (c) { return c; })) rows.push(row);
+        });
+        if (rows.length) values[f.id] = rows;
+        if (f.required && !rows.length) problems.push(f);
+        return;
+      }
+      if (f.type === 'radio') { var c2 = document.querySelector('input[name="' + id + '"]:checked'); v = c2 ? c2.value : ''; }
+      else { var el = document.getElementById(id); v = el ? el.value.trim() : ''; }
+      if (f.required && !v) problems.push(f);
+      if (v) values[f.id] = v;
+    });
+    return { values: values, problems: problems };
+  }
+  document.addEventListener('change', function (ev) {
+    var fid = ev.target.dataset && ev.target.dataset.file;
+    if (!fid) return;
+    var list = Array.prototype.slice.call(ev.target.files || []);
+    Promise.all(list.map(readFile)).then(function (arr) { files[fid] = (files[fid] || []).concat(arr).slice(0, 10); drawFiles(fid); ev.target.value = ''; }, function (e) { alert(e.message); ev.target.value = ''; });
+  });
+  document.addEventListener('click', function (ev) {
+    var ad = ev.target.closest('[data-addrow]');
+    if (ad) {
+      var fd = F.fields.filter(function (x) { return x.id === ad.dataset.addrow; })[0];
+      var boxT = document.getElementById('tb_' + fd.id);
+      var cnt = boxT.querySelectorAll('[data-trow]').length;
+      if (cnt < 15) boxT.insertAdjacentHTML('beforeend', tableRow(fd, cnt));
+      if (cnt + 1 >= 15) ad.style.display = 'none';
+    }
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-rm]'); if (!b) return;
+    files[b.dataset.rm].splice(Number(b.dataset.i), 1); drawFiles(b.dataset.rm);
+  });
+  document.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var c = collect(), errBox = document.getElementById('ferr');
+    if (c.problems.length) {
+      c.problems.forEach(function (f) { var box = document.querySelector('[data-fid="' + f.id + '"]'); if (box) box.classList.add('err-field'); });
+      errBox.innerHTML = '<div class="note warn">أكملي الحقول المطلوبة: ' + c.problems.map(function (f) { return esc(f.label); }).join('، ') + '</div>';
+      var first = document.querySelector('[data-fid="' + c.problems[0].id + '"]'); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (F.fields.some(function (f) { return f.id === 'visitor'; }) && c.values.visitor && c.values.visitor === c.values.visited) { errBox.innerHTML = '<div class="note warn">المعلمة الزائرة والمزارة لا يمكن أن تكونا نفس المعلمة.</div>'; return; }
+    var btn = ev.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
+    var payloadFiles = {}; Object.keys(files).forEach(function (k) { payloadFiles[k] = files[k].map(function (f) { return { name: f.name, mime: f.mime, data: f.data }; }); });
+    rpc('publicSubmit', [FORM_ID, { values: c.values, files: payloadFiles }]).then(function () {
+      msg('✅', 'تم الإرسال بنجاح', F.audience === 'parents' ? 'شكراً لمشاركتكم.' : 'وصل ردّكِ إلى المعلمة الأولى. شكراً لكِ.');
+      window.scrollTo(0, 0);
+    }, function (e) { btn.disabled = false; btn.textContent = 'إرسال'; errBox.innerHTML = '<div class="note warn">' + esc(e.message) + '</div>'; });
+  });
+  if (!FORM_ID) { msg('⚠️', 'الرابط غير مكتمل', 'تأكدي من نسخ الرابط كاملاً.'); return; }
+  if (!FORM_ID) { msg('⚠️', 'الرابط غير مكتمل', 'تأكدي من نسخ رابط النموذج كاملاً.'); return; }
+  rpc('publicForm', [FORM_ID]).then(function (f) {
+    F = f;
+    if (!f.open) { msg('⏸', 'النموذج غير متاح', f.reason || 'هذا النموذج مغلق.'); return; }
+    document.title = f.title;
+    renderForm();
+  }, function (e) { msg('⚠️', 'تعذّر فتح النموذج', e.message); });
+})();
+</script>
+</body>
+</html>
