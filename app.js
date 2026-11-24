@@ -206,7 +206,12 @@ function rootOf(v) {
 
 function render() {
   if (!S.token) { appEl.innerHTML = loginView(); var p = document.getElementById('pw'); if (p) p.focus(); return; }
-  if (!S.d) { appEl.innerHTML = '<div class="login"><div class="spinner" role="status" aria-label="جارٍ التحميل"></div></div>'; return; }
+  if (!S.d && S.loadErr) {
+    appEl.innerHTML = '<div class="login"><div class="box"><div class="card" style="text-align:center;display:flex;flex-direction:column;gap:12px"><h2 style="margin:0">تعذّر تحميل المنصة</h2><p class="small muted" style="margin:0">' + esc(S.loadErr) + '</p>' +
+      '<button class="btn pri block" type="button" data-act="retryLoad">إعادة المحاولة</button><button class="btn block" type="button" data-act="logout">الرجوع لصفحة الدخول</button></div></div></div>';
+    return;
+  }
+  if (!S.d) { appEl.innerHTML = '<div class="login"><div class="spinner" role="status" aria-label="جارٍ التحميل"></div><p class="xs muted" style="position:absolute;margin-top:90px">أول فتح في اليوم قد يأخذ حتى 20 ثانية…</p></div>'; return; }
   var fn = V[S.view] || V.home;
   try { appEl.innerHTML = fn(S.p); }
   catch (e) { console.error(e); appEl.innerHTML = shell('خطأ', '', '<div class="note warn">حدث خطأ في عرض الصفحة: ' + esc(e.message) + '</div>'); }
@@ -220,7 +225,11 @@ function loginView() {
 }
 
 function load() {
-  return run(call('bootstrap')).then(function (d) { S.d = d; render(); });
+  S.loadErr = null;
+  return run(call('bootstrap')).then(function (d) { S.d = d; render(); }, function (e) {
+    if (S.token && !S.d) { S.loadErr = (e && e.message) || 'تعذّر الاتصال بالخادم'; render(); }
+    throw e;
+  });
 }
 
 /* ================================================================== */
@@ -733,7 +742,8 @@ A.grade = function (el) { S.temp.names = null; go('grade', { id: el.dataset.id }
 A.response = function (el) { go('response', { id: el.dataset.id }); };
 A.tab = function (el) { S.tab[el.dataset.k] = el.dataset.v; render(); };
 A.copy = function (el) { copyText(el.dataset.text); };
-A.logout = function () { rpc('logout', [S.token]).catch(function () {}); forgetToken(); S.token = null; S.d = null; render(); };
+A.retryLoad = function () { S.loadErr = null; render(); load().catch(function () {}); };
+A.logout = function () { if (S.token) rpc('logout', [S.token]).catch(function () {}); forgetToken(); S.token = null; S.d = null; S.loadErr = null; render(); };
 
 A.level = function (el) {
   var p = S.p, lvl = Number(el.dataset.l);
